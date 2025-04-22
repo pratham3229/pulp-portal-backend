@@ -33,7 +33,7 @@ const connectDB = async () => {
     console.log(
       "Connection string:",
       process.env.MONGO_URI.replace(/\/\/[^@]+@/, "//****:****@")
-    ); // Log connection string with credentials hidden
+    );
 
     await mongoose.connect(process.env.MONGO_URI, {
       dbName: process.env.DATABASE_NAME,
@@ -44,7 +44,14 @@ const connectDB = async () => {
     // Initialize GridFS bucket
     const db = mongoose.connection.db;
     bucket = new GridFSBucket(db, { bucketName: "uploads" });
-    console.log("GridFS bucket initialized");
+    console.log("GridFS bucket initialized with bucket name: uploads");
+
+    // Verify GridFS collections exist
+    const collections = await db.listCollections().toArray();
+    console.log(
+      "Available collections:",
+      collections.map((c) => c.name)
+    );
   } catch (error) {
     console.error("MongoDB connection error:", error);
     process.exit(1);
@@ -84,11 +91,35 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
         .json({ success: false, error: "No file uploaded" });
     }
 
+    console.log("File upload started:", {
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+    });
+
+    if (!bucket) {
+      console.error("GridFS bucket not initialized");
+      return res
+        .status(500)
+        .json({ success: false, error: "Storage system not ready" });
+    }
+
     // Create a new file in GridFS
-    const uploadStream = bucket.openUploadStream(req.file.originalname);
-    uploadStream.end(req.file.buffer);
+    const uploadStream = bucket.openUploadStream(req.file.originalname, {
+      contentType: req.file.mimetype,
+    });
+
+    console.log("Upload stream created with id:", uploadStream.id);
+
+    // Write the buffer to GridFS
+    uploadStream.write(req.file.buffer);
+    uploadStream.end();
 
     uploadStream.on("finish", () => {
+      console.log("File upload completed:", {
+        fileId: uploadStream.id.toString(),
+        filename: req.file.originalname,
+      });
       res.status(200).json({
         success: true,
         fileId: uploadStream.id.toString(),
@@ -97,7 +128,7 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
     });
 
     uploadStream.on("error", (error) => {
-      console.error("Error uploading file:", error);
+      console.error("Error uploading file to GridFS:", error);
       res.status(500).json({ success: false, error: error.message });
     });
   } catch (error) {
