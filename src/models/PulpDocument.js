@@ -28,23 +28,41 @@ const pulpDocumentSchema = new mongoose.Schema({
 
   // File References
   files: {
-    geoToProducerInvoice: { type: String, default: null },
-    woodTransportDocs: { type: String, default: null },
-    producerToSupplierInvoice: { type: String, default: null },
-    pulpTransportDocs: { type: String, default: null },
-    supplierToITCInvoice: { type: String, default: null },
-    shippingDocs: { type: String, default: null },
-    ddsSummary: { type: String, default: null },
-    legalHarvestDocs: { type: String, default: null },
-    fscCertificates: { type: String, default: null },
-    fscCocCertificate: { type: String, default: null },
-    producerDeclaration: { type: String, default: null },
-    producerLicense: { type: String, default: null },
-    supplierLicense: { type: String, default: null },
-    ghgCertifications: { type: String, default: null },
-    safetyCertifications: { type: String, default: null },
-    humanRightsPolicies: { type: String, default: null },
-    employeeRecords: { type: String, default: null },
+    geoToProducerInvoice: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    woodTransportDocs: { type: mongoose.Schema.Types.ObjectId, default: null },
+    producerToSupplierInvoice: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    pulpTransportDocs: { type: mongoose.Schema.Types.ObjectId, default: null },
+    supplierToITCInvoice: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    shippingDocs: { type: mongoose.Schema.Types.ObjectId, default: null },
+    ddsSummary: { type: mongoose.Schema.Types.ObjectId, default: null },
+    legalHarvestDocs: { type: mongoose.Schema.Types.ObjectId, default: null },
+    fscCertificates: { type: mongoose.Schema.Types.ObjectId, default: null },
+    fscCocCertificate: { type: mongoose.Schema.Types.ObjectId, default: null },
+    producerDeclaration: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    producerLicense: { type: mongoose.Schema.Types.ObjectId, default: null },
+    supplierLicense: { type: mongoose.Schema.Types.ObjectId, default: null },
+    ghgCertifications: { type: mongoose.Schema.Types.ObjectId, default: null },
+    safetyCertifications: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    humanRightsPolicies: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+    employeeRecords: { type: mongoose.Schema.Types.ObjectId, default: null },
   },
 
   createdAt: { type: Date, default: Date.now },

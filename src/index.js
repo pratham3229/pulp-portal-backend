@@ -5,6 +5,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { GridFSBucket } = require("mongodb");
 const PulpDocument = require("./models/PulpDocument");
 const authRoutes = require("./routes/auth");
 const auth = require("./middleware/auth");
@@ -24,28 +25,28 @@ const username = encodeURIComponent("pratham3229");
 const password = encodeURIComponent("pspd@123");
 const uri = `mongodb+srv://${username}:${password}@cluster0.rc2vy.mongodb.net/downtime_data?retryWrites=true&w=majority`;
 
+let bucket;
 mongoose
   .connect(uri, {
     dbName: process.env.DATABASE_NAME,
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log("Connected to MongoDB"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+  .then(() => {
+    console.log("Connected to MongoDB");
+    // Initialize GridFS bucket
+    const db = mongoose.connection.db;
+    bucket = new GridFSBucket(db, { bucketName: "uploads" });
+    console.log("GridFS bucket initialized");
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+    process.exit(1);
+  });
 
-// File Storage Configuration
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    // Keep the original file extension
-    const ext = path.extname(file.originalname);
-    cb(null, Date.now() + ext);
-  },
-});
-
-const upload = multer({ storage: storage });
+// Configure multer for memory storage
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 // Auth Routes
 app.use("/api/auth", authRoutes);
@@ -72,34 +73,59 @@ app.post("/api/upload", auth, upload.single("file"), async (req, res) => {
         .status(400)
         .json({ success: false, error: "No file uploaded" });
     }
-    res.status(200).json({
-      success: true,
-      filePath: req.file.path,
-      fileName: req.file.filename,
+
+    // Create a new file in GridFS
+    const uploadStream = bucket.openUploadStream(req.file.originalname);
+    uploadStream.end(req.file.buffer);
+
+    uploadStream.on("finish", () => {
+      res.status(200).json({
+        success: true,
+        fileId: uploadStream.id.toString(),
+        fileName: req.file.originalname,
+      });
+    });
+
+    uploadStream.on("error", (error) => {
+      console.error("Error uploading file:", error);
+      res.status(500).json({ success: false, error: error.message });
     });
   } catch (error) {
-    console.error("Error uploading file:", error);
+    console.error("Error in upload handler:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 // Download endpoint
-app.get("/api/download/:fileName", auth, (req, res) => {
-  const fileName = req.params.fileName;
-  const filePath = path.join(__dirname, "../uploads", fileName);
+app.get("/api/download/:fileId", auth, async (req, res) => {
+  try {
+    const fileId = new mongoose.Types.ObjectId(req.params.fileId);
 
-  // Check if file exists
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ success: false, error: "File not found" });
-  }
+    const files = await bucket.find({ _id: fileId }).toArray();
 
-  // Send file
-  res.download(filePath, (err) => {
-    if (err) {
-      console.error("Error downloading file:", err);
-      res.status(500).json({ success: false, error: "Error downloading file" });
+    if (!files || files.length === 0) {
+      return res.status(404).json({ success: false, error: "File not found" });
     }
-  });
+
+    const file = files[0];
+    res.set("Content-Type", file.contentType || "application/octet-stream");
+    res.set("Content-Disposition", `attachment; filename="${file.filename}"`);
+
+    const downloadStream = bucket.openDownloadStream(fileId);
+    downloadStream.on("error", (error) => {
+      console.error("Error streaming file:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, error: "Error streaming file" });
+      }
+    });
+
+    downloadStream.pipe(res);
+  } catch (error) {
+    console.error("Error in download handler:", error);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 });
 
 app.get("/api/documents", auth, async (req, res) => {
