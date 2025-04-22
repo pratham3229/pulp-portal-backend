@@ -21,28 +21,38 @@ app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
 // MongoDB Connection
-const username = encodeURIComponent("pratham3229");
-const password = encodeURIComponent("pspd@123");
-const uri = `mongodb+srv://${username}:${password}@cluster0.rc2vy.mongodb.net/downtime_data?retryWrites=true&w=majority`;
-
 let bucket;
-mongoose
-  .connect(uri, {
-    dbName: process.env.DATABASE_NAME,
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
-  .then(() => {
+
+const connectDB = async () => {
+  try {
+    if (!process.env.MONGO_URI) {
+      throw new Error("MONGO_URI is not defined in environment variables");
+    }
+
+    console.log("Attempting to connect to MongoDB...");
+    console.log(
+      "Connection string:",
+      process.env.MONGO_URI.replace(/\/\/[^@]+@/, "//****:****@")
+    ); // Log connection string with credentials hidden
+
+    await mongoose.connect(process.env.MONGO_URI, {
+      dbName: process.env.DATABASE_NAME,
+    });
+
     console.log("Connected to MongoDB");
+
     // Initialize GridFS bucket
     const db = mongoose.connection.db;
     bucket = new GridFSBucket(db, { bucketName: "uploads" });
     console.log("GridFS bucket initialized");
-  })
-  .catch((err) => {
-    console.error("MongoDB connection error:", err);
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
     process.exit(1);
-  });
+  }
+};
+
+// Connect to MongoDB
+connectDB();
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
