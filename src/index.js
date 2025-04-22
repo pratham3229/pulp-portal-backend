@@ -17,6 +17,11 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
+// Root route for healthcheck
+app.get("/", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Server is running" });
+});
+
 // Serve static files from uploads directory
 app.use("/uploads", express.static("uploads"));
 
@@ -204,6 +209,23 @@ app.get("/api/documents/:id", auth, async (req, res) => {
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({
+    success: false,
+    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+  });
+});
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    error: 'Route not found'
+  });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
