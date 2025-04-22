@@ -19,7 +19,15 @@ app.use(express.json());
 
 // Root route for healthcheck
 app.get("/", (req, res) => {
-  res.status(200).json({ status: "ok", message: "Server is running" });
+  const status = {
+    status: "ok",
+    message: "Server is running",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    mongodb:
+      mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+  };
+  res.status(200).json(status);
 });
 
 // Serve static files from uploads directory
@@ -215,7 +223,10 @@ app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({
     success: false,
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    error:
+      process.env.NODE_ENV === "development"
+        ? err.message
+        : "Internal server error",
   });
 });
 
@@ -223,7 +234,7 @@ app.use((err, req, res, next) => {
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    error: 'Route not found'
+    error: "Route not found",
   });
 });
 
